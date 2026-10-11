@@ -63,7 +63,7 @@ const stats=document.querySelector('#stats'),count=document.querySelector('#coun
 const isTouch=matchMedia('(pointer: coarse)').matches||('ontouchstart'in window);
 let myId=null,roomId=null,gameStarted=false,yaw=0,pitch=0,score=0,lastMoveSent=0,lastTag=0;
 let jumpY=0,verticalVelocity=0;
-let verticalVelocity=0, isJumping=false;
+
 const players=new Map(),keys=new Set(),clock=new THREE.Clock(),moveVec=new THREE.Vector3(),raycaster=new THREE.Raycaster();
 let mobileMove={x:0,y:0},lookPointer=null,movePointer=null,lastLook={x:0,y:0};
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x8cb5ca);scene.fog=new THREE.Fog(0x8cb5ca,32,100);
