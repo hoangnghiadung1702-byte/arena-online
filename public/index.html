@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Arena Online — Multiplayer</title>
+<style>
+:root{color-scheme:dark;--panel:rgba(11,18,29,.94);--line:#35485c;--accent:#5ed0ff}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101722;color:#f3f7fb;font-family:Inter,system-ui,Arial,sans-serif}canvas{display:block}
+#menu{position:fixed;z-index:10;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(130deg,rgba(7,14,24,.94),rgba(14,34,50,.82));padding:18px}
+.panel{width:min(440px,100%);padding:25px;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:0 24px 80px #0008}
+h1{margin:0 0 7px;font-size:30px;letter-spacing:1px}.sub{color:#a8b8c9;font-size:14px;line-height:1.5;margin:0 0 22px}
+label{display:block;color:#b8c8d8;font-size:13px;margin:12px 0 6px}input,button{font:inherit;border-radius:10px;padding:12px;border:1px solid #3a5065;width:100%}input{color:white;background:#111e2c;outline:none}input:focus{border-color:var(--accent)}
+button{cursor:pointer;background:#173b50;color:#fff;font-weight:700;border-color:#2e617b;margin-top:10px}button.primary{background:linear-gradient(100deg,#0785b5,#20a6c9);border:0}button:disabled{opacity:.5;cursor:wait}
+.joinrow{display:flex;gap:8px}.joinrow input{min-width:0}.joinrow button{width:130px;flex-shrink:0;margin:0}#error{color:#ff9292;min-height:20px;font-size:13px;margin-top:10px}
+#hud{display:none;position:fixed;z-index:3;inset:0;pointer-events:none;text-shadow:0 2px 4px #000}
+#topbar{position:absolute;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.chip{background:#0b1423c9;border:1px solid #ffffff24;padding:9px 12px;border-radius:10px;font-size:13px}
+#crosshair{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%)}#crosshair:before,#crosshair:after{content:"";position:absolute;background:white;box-shadow:0 0 4px #000}#crosshair:before{width:2px;height:18px;left:8px;top:0}#crosshair:after{height:2px;width:18px;left:0;top:8px}
+#feed{position:absolute;top:70px;right:14px;max-width:260px;text-align:right;font-size:13px;color:#dcecff}
+#help{position:absolute;bottom:15px;left:14px;color:#d5e4f2;font-size:12px;max-width:280px;line-height:1.6}
+#mobileControls{display:none;position:fixed;z-index:5;inset:0;pointer-events:none}.touchpad{position:absolute;bottom:25px;width:140px;height:140px;border-radius:50%;background:#16283c99;border:1px solid #ffffff35;pointer-events:auto;touch-action:none}
+#stick{left:20px}#look{right:20px}.knob{position:absolute;left:42px;top:42px;width:54px;height:54px;border-radius:50%;background:#78d9ff99;border:1px solid #b8edff}
+#tagBtn{position:absolute;right:35px;bottom:185px;width:78px;height:78px;border-radius:50%;pointer-events:auto;background:#168e9dcc;border:2px solid #c4fff4;touch-action:manipulation}
+#mobileHint{position:absolute;bottom:174px;left:22px;color:#fff9;font-size:11px}
+@media(pointer:coarse){#mobileControls.active{display:block}#help{display:none}}@media(max-width:600px){h1{font-size:26px}.panel{padding:20px}#topbar{top:8px;left:8px;right:8px}.chip{font-size:11px;padding:7px 9px}}
+</style></head>
+<body>
+<div id="menu"><div class="panel">
+<h1>ARENA <span style="color:var(--accent)">ONLINE</span></h1>
+<p class="sub">Đấu trường 3D nhiều người chơi · Tạo phòng bằng ID · Tối đa 8 người<br>Chạy quanh đấu trường và chạm đối thủ để ghi điểm.</p>
+<label for="name">Tên người chơi</label><input id="name" maxlength="18" placeholder="Ví dụ: PlayerOne" autocomplete="nickname">
+<button id="create" class="primary">＋ Tạo phòng mới</button>
+<label for="room">Hoặc nhập ID phòng</label><div class="joinrow"><input id="room" maxlength="5" placeholder="VD: A7K2Q" autocapitalize="characters"><button id="join">Tham gia</button></div>
+<div id="error" role="status"></div>
+<p class="sub" style="margin:8px 0 0;font-size:12px">PC: WASD di chuyển · Chuột nhìn · E chạm người chơi ở gần<br>Điện thoại: cần ảo trái để đi, phải để nhìn, nút CHẠM để ghi điểm.</p>
+</div></div>
+<div id="hud"><div id="topbar"><div class="chip" id="roomBadge">PHÒNG —</div><div class="chip" id="stats">Điểm 0</div><div class="chip" id="count">Người chơi: 1/8</div></div><div id="crosshair"></div><div id="feed"></div><div id="help">W A S D: di chuyển · Chuột: nhìn quanh<br>E: chạm người chơi ở gần · ESC: nhả chuột</div></div>
+<div id="mobileControls"><div id="stick" class="touchpad"><div class="knob"></div></div><div id="look" class="touchpad"><div class="knob"></div></div><button id="tagBtn">CHẠM</button><div id="mobileHint">Kéo trái: đi · Kéo phải: nhìn</div></div>
+<script src="/socket.io/socket.io.js"></script>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const socket=io(),menu=document.querySelector('#menu'),hud=document.querySelector('#hud'),mobileControls=document.querySelector('#mobileControls');
+const errorBox=document.querySelector('#error'),nameInput=document.querySelector('#name'),roomInput=document.querySelector('#room');
+const createBtn=document.querySelector('#create'),joinBtn=document.querySelector('#join'),roomBadge=document.querySelector('#roomBadge');
+const stats=document.querySelector('#stats'),count=document.querySelector('#count'),feed=document.querySelector('#feed');
+const isTouch=matchMedia('(pointer: coarse)').matches||('ontouchstart'in window);
+let myId=null,roomId=null,gameStarted=false,yaw=0,pitch=0,score=0,lastMoveSent=0,lastTag=0;
+const players=new Map(),keys=new Set(),clock=new THREE.Clock(),moveVec=new THREE.Vector3(),raycaster=new THREE.Raycaster();
+let mobileMove={x:0,y:0},lookPointer=null,movePointer=null,lastLook={x:0,y:0};
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x8cb5ca);scene.fog=new THREE.Fog(0x8cb5ca,32,100);
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,150);camera.position.set(0,1.65,8);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xdff3ff,0x43505d,2));
+const sun=new THREE.DirectionalLight(0xfff0d8,2.4);sun.position.set(-10,22,8);scene.add(sun);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({color:0x586c70,roughness:.95}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+const grid=new THREE.GridHelper(60,60,0x93b2ad,0x748b8b);grid.position.y=.015;scene.add(grid);
+const obstacles=[],wallMat=new THREE.MeshStandardMaterial({color:0x697d88,roughness:.86}),crateMat=new THREE.MeshStandardMaterial({color:0x9b7956,roughness:.9});
+function box(x,y,z,w,h,d,mat=wallMat){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);scene.add(m);obstacles.push(m);return m}
+box(0,1.5,-30,60,3,1);box(0,1.5,30,60,3,1);box(-30,1.5,0,1,3,60);box(30,1.5,0,1,3,60);
+[[-8,0,-7,3,2.3,3],[7,0,-9,4,2.8,2],[0,0,-15,5,1.5,2],[-15,0,4,2.5,2.5,5],[13,0,3,3,2,3],[1,0,7,4,1.5,2],[-5,0,15,3,2,3],[10,0,16,4,2.5,2],[-18,0,-14,3,2,3],[19,0,-12,2,2.5,4],[0,0,0,2,1.4,2]].forEach(a=>box(a[0],a[1]+a[4]/2,a[2],a[3],a[4],a[5],crateMat));
+function makePlayer(data){
+ const group=new THREE.Group(),mat=new THREE.MeshStandardMaterial({color:data.color||'#58c4f6',roughness:.7});
+ const torso=new THREE.Mesh(new THREE.BoxGeometry(.65,.85,.35),mat);torso.position.y=1.05;group.add(torso);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.23,14,12),new THREE.MeshStandardMaterial({color:0xe1b99a}));head.position.y=1.68;group.add(head);
+ const legsMat=new THREE.MeshStandardMaterial({color:0x263543});
+ for(const x of [-.19,.19]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.2,.55,.23),legsMat);leg.position.set(x,.35,0);group.add(leg)}
+ const c=document.createElement('canvas');c.width=256;c.height=64;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.font='bold 28px Arial';ctx.textAlign='center';ctx.fillText(String(data.name||'Player').slice(0,18),128,38);
+ const tex=new THREE.CanvasTexture(c),label=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));label.position.y=2.15;label.scale.set(2.4,.6,1);group.add(label);
+ group.userData={id:data.id,name:data.name,score:data.score||0,target:new THREE.Vector3(data.x||0,0,data.z||0)};
+ group.position.set(data.x||0,0,data.z||0);scene.add(group);return group;
+}
+function upsertPlayer(d){if(!d||d.id===myId)return;let p=players.get(d.id);if(!p){p=makePlayer(d);players.set(d.id,p)}p.userData.target.set(Number(d.x)||0,0,Number(d.z)||0);if(Number.isFinite(d.yaw))p.rotation.y=d.yaw;p.userData.score=d.score||0}
+function updateState(s){if(s.roomId)roomId=s.roomId;const incoming=s.players||[],ids=new Set(incoming.map(p=>p.id));for(const [id,p]of players)if(!ids.has(id)){scene.remove(p);players.delete(id)}for(const p of incoming)upsertPlayer(p);count.textContent=`Người chơi: ${incoming.length}/8`;const me=incoming.find(p=>p.id===myId);if(me){score=me.score;stats.textContent=`Điểm ${score}`}}
+function message(msg){const el=document.createElement('div');el.textContent=msg;el.style.marginBottom='6px';feed.prepend(el);while(feed.children.length>4)feed.lastChild.remove();setTimeout(()=>el.remove(),5000)}
+socket.on('connect',()=>errorBox.textContent='');socket.on('disconnect',()=>{if(gameStarted)message('Mất kết nối máy chủ. Đang kết nối lại…')});
+socket.on('roomState',updateState);socket.on('playerMoved',d=>{const p=players.get(d.id);if(p){p.userData.target.set(d.x,0,d.z);p.rotation.y=d.yaw}});
+socket.on('systemMessage',message);socket.on('connect_error',()=>errorBox.textContent='Không kết nối được máy chủ. Hãy tải lại trang.');
+function enter(id){roomId=id;gameStarted=true;menu.style.display='none';hud.style.display='block';roomBadge.textContent=`PHÒNG ${id}`;mobileControls.classList.toggle('active',isTouch);camera.position.set(0,1.65,8);if(!isTouch)renderer.domElement.requestPointerLock?.();message(`Đã vào phòng ${id}. Gửi ID cho bạn bè!`)}
+function playerName(){return nameInput.value.trim()||'Player'}
+createBtn.addEventListener('click',()=>{errorBox.textContent='';createBtn.disabled=true;socket.emit('createRoom',{name:playerName()},r=>{createBtn.disabled=false;if(!r?.ok){errorBox.textContent=r?.error||'Không tạo được phòng';return}myId=r.playerId;enter(r.roomId)})});
+joinBtn.addEventListener('click',()=>{errorBox.textContent='';joinBtn.disabled=true;socket.emit('joinRoom',{roomId:roomInput.value,name:playerName()},r=>{joinBtn.disabled=false;if(!r?.ok){errorBox.textContent=r?.error||'Không tham gia được phòng';return}myId=r.playerId;enter(r.roomId)})});
+roomInput.addEventListener('input',()=>roomInput.value=roomInput.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5));
+document.addEventListener('keydown',e=>{keys.add(e.code);if(e.code==='KeyE')tagNearest();if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()});document.addEventListener('keyup',e=>keys.delete(e.code));
+document.addEventListener('mousemove',e=>{if(document.pointerLockElement===renderer.domElement&&gameStarted){yaw-=e.movementX*.0022;pitch-=e.movementY*.0022;pitch=Math.max(-1.4,Math.min(1.4,pitch))}});
+renderer.domElement.addEventListener('click',()=>{if(gameStarted&&!isTouch&&document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock?.()});
+function tagNearest(){if(!gameStarted||Date.now()-lastTag<350)return;lastTag=Date.now();let nearest=null,dist=2.4;for(const [id,p]of players){const d=Math.hypot(camera.position.x-p.position.x,camera.position.z-p.position.z);if(d<dist){dist=d;nearest=id}}if(nearest)socket.emit('tag',{targetId:nearest});else message('Hãy đến gần người chơi khác để chạm!')}
+document.querySelector('#tagBtn').addEventListener('pointerdown',e=>{e.preventDefault();tagNearest()});
+function bindPad(el,kind){const knob=el.querySelector('.knob');el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);if(kind==='move')movePointer=e.pointerId;else lookPointer=e.pointerId;lastLook={x:e.clientX,y:e.clientY};handle(e)});el.addEventListener('pointermove',e=>{if((kind==='move'&&e.pointerId===movePointer)||(kind==='look'&&e.pointerId===lookPointer)){e.preventDefault();if(kind==='move')handle(e);else{yaw-=(e.clientX-lastLook.x)*.009;pitch-=(e.clientY-lastLook.y)*.009;pitch=Math.max(-1.35,Math.min(1.35,pitch));lastLook={x:e.clientX,y:e.clientY}}}});function release(e){if(kind==='move'&&e.pointerId===movePointer){movePointer=null;mobileMove={x:0,y:0};knob.style.transform='translate(0,0)'}if(kind==='look'&&e.pointerId===lookPointer)lookPointer=null}el.addEventListener('pointerup',release);el.addEventListener('pointercancel',release);function handle(e){const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy,max=43,len=Math.hypot(dx,dy);if(len>max){dx=dx/len*max;dy=dy/len*max}knob.style.transform=`translate(${dx}px,${dy}px)`;mobileMove={x:dx/max,y:dy/max}}}
+bindPad(document.querySelector('#stick'),'move');bindPad(document.querySelector('#look'),'look');
+function collides(x,z){for(const o of obstacles){const b=new THREE.Box3().setFromObject(o);if(x>b.min.x-.35&&x<b.max.x+.35&&z>b.min.z-.35&&z<b.max.z+.35&&b.max.y>.6)return true}return false}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);if(gameStarted){camera.rotation.order='YXZ';camera.rotation.y=yaw;camera.rotation.x=pitch;const forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0)-mobileMove.y,strafe=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0)+mobileMove.x;moveVec.set(strafe,0,-forward);if(moveVec.lengthSq()>1)moveVec.normalize();moveVec.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);const speed=(keys.has('ShiftLeft')?8:5)*dt,nx=camera.position.x+moveVec.x*speed,nz=camera.position.z+moveVec.z*speed;if(Math.abs(nx)<28&&!collides(nx,camera.position.z))camera.position.x=nx;if(Math.abs(nz)<28&&!collides(camera.position.x,nz))camera.position.z=nz;camera.position.y=1.65;const now=performance.now();if(now-lastMoveSent>50&&socket.connected){lastMoveSent=now;socket.emit('move',{x:camera.position.x,z:camera.position.z,yaw})}for(const p of players.values())p.position.lerp(p.userData.target,Math.min(1,dt*14))}renderer.render(scene,camera)}
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});animate();
+</script></body></html>
