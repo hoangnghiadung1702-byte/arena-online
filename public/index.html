@@ -74,7 +74,21 @@ function message(msg){const el=document.createElement('div');el.textContent=msg;
 socket.on('connect',()=>errorBox.textContent='');socket.on('disconnect',()=>{if(gameStarted)message('Mất kết nối máy chủ. Đang kết nối lại…')});
 socket.on('roomState',updateState);socket.on('playerMoved',d=>{const p=players.get(d.id);if(p){p.userData.target.set(d.x,0,d.z);p.rotation.y=d.yaw}});
 socket.on('systemMessage',message);socket.on('connect_error',()=>errorBox.textContent='Không kết nối được máy chủ. Hãy tải lại trang.');
-function enter(id){roomId=id;gameStarted=true;menu.style.display='none';hud.style.display='block';roomBadge.textContent=`PHÒNG ${id}`;mobileControls.classList.toggle('active',isTouch);camera.position.set(0,1.65,8);if(!isTouch)renderer.domElement.requestPointerLock?.();message(`Đã vào phòng ${id}. Gửi ID cho bạn bè!`)}
+
+function enter(id){
+  roomId=id;
+  gameStarted=true;
+  menu.style.display='none';
+  hud.style.display='block';
+  roomBadge.textContent=`PHÒNG ${id}`;
+  mobileControls.classList.toggle('active',isTouch);
+  camera.position.set(0,1.65,8);
+  if(!isTouch){
+    renderer.domElement.requestPointerLock?.().catch(()=>{});
+  }
+  message(`Đã vào phòng ${id}. Gửi ID cho bạn bè!`);
+}
+
 function playerName(){return nameInput.value.trim()||'Player'}
 createBtn.addEventListener('click',()=>{errorBox.textContent='';createBtn.disabled=true;socket.emit('createRoom',{name:playerName()},r=>{createBtn.disabled=false;if(!r?.ok){errorBox.textContent=r?.error||'Không tạo được phòng';return}myId=r.playerId;enter(r.roomId)})});
 joinBtn.addEventListener('click',()=>{errorBox.textContent='';joinBtn.disabled=true;socket.emit('joinRoom',{roomId:roomInput.value,name:playerName()},r=>{joinBtn.disabled=false;if(!r?.ok){errorBox.textContent=r?.error||'Không tham gia được phòng';return}myId=r.playerId;enter(r.roomId)})});
