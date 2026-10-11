@@ -67,7 +67,7 @@ let jumpY=0,verticalVelocity=0;
 const players=new Map(),keys=new Set(),clock=new THREE.Clock(),moveVec=new THREE.Vector3(),raycaster=new THREE.Raycaster();
 let mobileMove={x:0,y:0},lookPointer=null,movePointer=null,lastLook={x:0,y:0};
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x8cb5ca);scene.fog=new THREE.Fog(0x8cb5ca,32,100);
-const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,150);camera.position.set(0,1.65,8);
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,150);camera.position.set(0,1.65,11);
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xdff3ff,0x43505d,2));
 const sun=new THREE.DirectionalLight(0xfff0d8,2.4);sun.position.set(-10,22,8);scene.add(sun);
@@ -102,7 +102,7 @@ function enter(id){
   hud.style.display='block';
   roomBadge.textContent=`PHÒNG ${id}`;
   mobileControls.classList.toggle('active',isTouch);
-  camera.position.set(0,1.65,8);
+  camera.position.set(0,1.65,11);
   if(!isTouch){
     renderer.domElement.requestPointerLock?.().catch(()=>{});
   }
