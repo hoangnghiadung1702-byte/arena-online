@@ -73,8 +73,8 @@ button{cursor:pointer;background:#173b50;color:#fff;font-weight:700;border-color
  </div>
 </div>
 
-<div id="mobileControls"><div id="stick" class="touchpad"><div class="knob"></div></div><div id="look" class="touchpad"><div class="knob"></div></div><button id="tagBtn">CHẠM</button><div id="mobileHint">Kéo trái: đi · Kéo phải: nhìn</div></div>
-<button id="jumpBtn">NHẢY</button>
+<div id="mobileControls"><div id="stick" class="touchpad"><div class="knob"></div></div><div id="look" class="touchpad"><div class="knob"></div></div><div id="mobileHint">Kéo trái: đi · Kéo phải: nhìn</div></div>
+<button id="tagBtn">CHẠM</button><button id="jumpBtn">NHẢY</button>
 <script src="/socket.io/socket.io.js"></script>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
@@ -206,7 +206,7 @@ socket.on('roomState',updateState);socket.on('playerMoved',d=>{const p=players.g
 socket.on('systemMessage',message);socket.on('connect_error',()=>errorBox.textContent='Không kết nối được máy chủ. Hãy tải lại trang.');
 
 function enter(id){document.querySelector('#jumpBtn').style.display = isTouch ? 'block' : 'none';
-document.querySelector('#tagBtn').style.display = isTouch ? 'block' : 'none';
+document.querySelector('#tagBtn').style.display = 'block';
   roomId=id;
   gameStarted=true;
   menu.style.display='none';
