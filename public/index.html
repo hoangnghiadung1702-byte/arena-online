@@ -62,13 +62,14 @@ button{cursor:pointer;background:#173b50;color:#fff;font-weight:700;border-color
 <p class="sub" style="margin:8px 0 0;font-size:12px">PC: WASD di chuyển · Chuột nhìn · E chạm người chơi ở gần<br>Điện thoại: cần ảo trái để đi, phải để nhìn, nút CHẠM để ghi điểm.</p>
 </div></div>
 
-<div id="topbar">
+<div id="hud">
+  <div id="topbar">
   <div class="chip" id="roomBadge">PHÒNG —</div>
   <div class="chip" id="roleBadge">Đang chờ người chơi</div>
   <div class="chip" id="roundTimer">02:00</div>
   <div class="chip" id="stats">Điểm 0</div>
   <div class="chip" id="count">Người chơi: 1/8</div>
-</div>
+</div></div>
 
 <div id="mobileControls"><div id="stick" class="touchpad"><div class="knob"></div></div><div id="look" class="touchpad"><div class="knob"></div></div><button id="tagBtn">CHẠM</button><div id="mobileHint">Kéo trái: đi · Kéo phải: nhìn</div></div>
 <button id="jumpBtn">NHẢY</button>
@@ -221,44 +222,16 @@ function playerName(){return nameInput.value.trim()||'Player'}
 createBtn.addEventListener('click',()=>{errorBox.textContent='';createBtn.disabled=true;socket.emit('createRoom',{name:playerName()},r=>{createBtn.disabled=false;if(!r?.ok){errorBox.textContent=r?.error||'Không tạo được phòng';return}myId=r.playerId;enter(r.roomId)})});
 joinBtn.addEventListener('click',()=>{errorBox.textContent='';joinBtn.disabled=true;socket.emit('joinRoom',{roomId:roomInput.value,name:playerName()},r=>{joinBtn.disabled=false;if(!r?.ok){errorBox.textContent=r?.error||'Không tham gia được phòng';return}myId=r.playerId;enter(r.roomId)})});
 roomInput.addEventListener('input',()=>roomInput.value=roomInput.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5));
-document.addEventListener('keydown',e=>{
+
+document.addEventListener('keydown', e => {
   keys.add(e.code);
+});
+
+document.addEventListener('keyup', e => {
+  keys.delete(e.code);
+});
+
   
-function tagNearest() {
-  if (!gameStarted || !roundActive) {
-    message('Ván đấu chưa bắt đầu!');
-    return;
-  }
-
-  if (myRole !== 'chaser') {
-    message('Bạn là người chạy! Hãy tránh người đuổi.');
-    return;
-  }
-
-  if (Date.now() - lastTag < 350) return;
-  lastTag = Date.now();
-
-  let nearest = null;
-  let dist = 2.4;
-
-  for (const [id, p] of players) {
-    const d = Math.hypot(
-      camera.position.x - p.position.x,
-      camera.position.z - p.position.z
-    );
-
-    if (d < dist) {
-      dist = d;
-      nearest = id;
-    }
-  }
-
-  if (nearest) {
-    socket.emit('tag', { targetId: nearest });
-  } else {
-    message('Hãy đến gần người chơi khác để chạm!');
-  }
-}
 
 document.addEventListener('mousemove',e=>{if(document.pointerLockElement===renderer.domElement&&gameStarted){yaw-=e.movementX*.0022;pitch-=e.movementY*.0022;pitch=Math.max(-1.4,Math.min(1.4,pitch))}});
 renderer.domElement.addEventListener('click',()=>{if(gameStarted&&!isTouch&&document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock?.()});
