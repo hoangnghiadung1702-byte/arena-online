@@ -19,24 +19,35 @@ button{cursor:pointer;background:#173b50;color:#fff;font-weight:700;border-color
 #help{position:absolute;bottom:15px;left:14px;color:#d5e4f2;font-size:12px;max-width:280px;line-height:1.6}
 #mobileControls{display:none;position:fixed;z-index:5;inset:0;pointer-events:none}.touchpad{position:absolute;bottom:25px;width:140px;height:140px;border-radius:50%;background:#16283c99;border:1px solid #ffffff35;pointer-events:auto;touch-action:none}
 #stick{left:20px}#look{right:20px}.knob{position:absolute;left:42px;top:42px;width:54px;height:54px;border-radius:50%;background:#78d9ff99;border:1px solid #b8edff}
-#tagBtn
-#jumpBtn{
-  position:absolute;
-  right:35px;
-  bottom:275px;
-  width:78px;
-  height:78px;
-  padding:0;
-  margin:0;
-  border-radius:50%;
-  pointer-events:auto;
-  background:#e6a23cdd;
-  border:2px solid #ffe0a3;
-  color:white;
-  font-weight:800;
-  touch-action:manipulation;
+
+#tagBtn, #jumpBtn {
+  display: none;
+  position: fixed;
+  z-index: 6;
+  right: 35px;
+  width: 78px;
+  height: 78px;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  pointer-events: auto;
+  color: white;
+  font-weight: 800;
+  touch-action: manipulation;
 }
-{position:absolute;right:35px;bottom:185px;width:78px;height:78px;border-radius:50%;pointer-events:auto;background:#168e9dcc;border:2px solid #c4fff4;touch-action:manipulation}
+
+#jumpBtn {
+  bottom: 275px;
+  background: #e6a23cdd;
+  border: 2px solid #ffe0a3;
+}
+
+#tagBtn {
+  bottom: 185px;
+  background: #168e9dcc;
+  border: 2px solid #c4fff4;
+}
+
 #mobileHint{position:absolute;bottom:174px;left:22px;color:#fff9;font-size:11px}
 @media(pointer:coarse){#mobileControls.active{display:block}#help{display:none}}@media(max-width:600px){h1{font-size:26px}.panel{padding:20px}#topbar{top:8px;left:8px;right:8px}.chip{font-size:11px;padding:7px 9px}}
 </style></head>
@@ -50,7 +61,15 @@ button{cursor:pointer;background:#173b50;color:#fff;font-weight:700;border-color
 <div id="error" role="status"></div>
 <p class="sub" style="margin:8px 0 0;font-size:12px">PC: WASD di chuyển · Chuột nhìn · E chạm người chơi ở gần<br>Điện thoại: cần ảo trái để đi, phải để nhìn, nút CHẠM để ghi điểm.</p>
 </div></div>
-<div id="hud"><div id="topbar"><div class="chip" id="roomBadge">PHÒNG —</div><div class="chip" id="stats">Điểm 0</div><div class="chip" id="count">Người chơi: 1/8</div></div><div id="crosshair"></div><div id="feed"></div><div id="help">W A S D: di chuyển · Chuột: nhìn quanh<br>E: chạm người chơi ở gần · ESC: nhả chuột</div></div>
+
+<div id="topbar">
+  <div class="chip" id="roomBadge">PHÒNG —</div>
+  <div class="chip" id="roleBadge">Đang chờ người chơi</div>
+  <div class="chip" id="roundTimer">02:00</div>
+  <div class="chip" id="stats">Điểm 0</div>
+  <div class="chip" id="count">Người chơi: 1/8</div>
+</div>
+
 <div id="mobileControls"><div id="stick" class="touchpad"><div class="knob"></div></div><div id="look" class="touchpad"><div class="knob"></div></div><button id="tagBtn">CHẠM</button><div id="mobileHint">Kéo trái: đi · Kéo phải: nhìn</div></div>
 <button id="jumpBtn">NHẢY</button>
 <script src="/socket.io/socket.io.js"></script>
@@ -60,6 +79,13 @@ const socket=io(),menu=document.querySelector('#menu'),hud=document.querySelecto
 const errorBox=document.querySelector('#error'),nameInput=document.querySelector('#name'),roomInput=document.querySelector('#room');
 const createBtn=document.querySelector('#create'),joinBtn=document.querySelector('#join'),roomBadge=document.querySelector('#roomBadge');
 const stats=document.querySelector('#stats'),count=document.querySelector('#count'),feed=document.querySelector('#feed');
+
+const roleBadge = document.querySelector('#roleBadge');
+const roundTimer = document.querySelector('#roundTimer');
+let myRole = 'runner';
+let roundEndsAt = 0;
+let roundActive = false;
+
 const isTouch=matchMedia('(pointer: coarse)').matches||('ontouchstart'in window);
 let myId=null,roomId=null,gameStarted=false,yaw=0,pitch=0,score=0,lastMoveSent=0,lastTag=0;
 let jumpY=0,verticalVelocity=0;
@@ -85,17 +111,99 @@ function makePlayer(data){
  for(const x of [-.19,.19]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.2,.55,.23),legsMat);leg.position.set(x,.35,0);group.add(leg)}
  const c=document.createElement('canvas');c.width=256;c.height=64;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.font='bold 28px Arial';ctx.textAlign='center';ctx.fillText(String(data.name||'Player').slice(0,18),128,38);
  const tex=new THREE.CanvasTexture(c),label=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));label.position.y=2.15;label.scale.set(2.4,.6,1);group.add(label);
- group.userData={id:data.id,name:data.name,score:data.score||0,target:new THREE.Vector3(data.x||0,0,data.z||0)};
- group.position.set(data.x||0,0,data.z||0);scene.add(group);return group;
+ 
+group.userData = {
+  id: data.id,
+  name: data.name,
+  score: data.score || 0,
+  role: data.role || 'runner',
+  target: new THREE.Vector3(data.x || 0, 0, data.z || 0)
+};
+
+group.position.set(data.x || 0, 0, data.z || 0);
+scene.add(group);
+
+const outline = new THREE.BoxHelper(group, 0xff3030);
+outline.visible = data.role === 'chaser';
+scene.add(outline);
+group.userData.outline = outline;
+
+return group;
+
 }
-function upsertPlayer(d){if(!d||d.id===myId)return;let p=players.get(d.id);if(!p){p=makePlayer(d);players.set(d.id,p)}p.userData.target.set(Number(d.x)||0,0,Number(d.z)||0);if(Number.isFinite(d.yaw))p.rotation.y=d.yaw;p.userData.score=d.score||0}
-function updateState(s){if(s.roomId)roomId=s.roomId;const incoming=s.players||[],ids=new Set(incoming.map(p=>p.id));for(const [id,p]of players)if(!ids.has(id)){scene.remove(p);players.delete(id)}for(const p of incoming)upsertPlayer(p);count.textContent=`Người chơi: ${incoming.length}/8`;const me=incoming.find(p=>p.id===myId);if(me){score=me.score;stats.textContent=`Điểm ${score}`}}
+
+function upsertPlayer(d) {
+  if (!d || d.id === myId) return;
+
+  let p = players.get(d.id);
+
+  if (!p) {
+    p = makePlayer(d);
+    players.set(d.id, p);
+  }
+
+  p.userData.target.set(Number(d.x) || 0, 0, Number(d.z) || 0);
+  p.userData.score = d.score || 0;
+  p.userData.role = d.role || 'runner';
+
+  if (Number.isFinite(d.yaw)) p.rotation.y = d.yaw;
+
+  if (p.userData.outline) {
+    p.userData.outline.visible = p.userData.role === 'chaser';
+  }
+}
+
+function updateState(s) {
+  if (s.roomId) roomId = s.roomId;
+
+  roundActive = !!s.roundActive;
+  roundEndsAt = Number(s.endsAt) || 0;
+
+  const incoming = s.players || [];
+  const ids = new Set(incoming.map(p => p.id));
+
+  for (const [id, p] of players) {
+    if (!ids.has(id)) {
+      scene.remove(p);
+      if (p.userData.outline) scene.remove(p.userData.outline);
+      players.delete(id);
+    }
+  }
+
+  for (const p of incoming) upsertPlayer(p);
+
+  count.textContent = `Người chơi: ${incoming.length}/8`;
+
+  const me = incoming.find(p => p.id === myId);
+  if (me) {
+    score = me.score || 0;
+    stats.textContent = `Điểm ${score}`;
+  }
+
+  myRole = s.chaserId === myId ? 'chaser' : 'runner';
+
+  if (incoming.length < 2) {
+    roleBadge.textContent = 'Đang chờ người chơi';
+    roleBadge.style.borderColor = '#ffffff24';
+  } else if (!roundActive) {
+    roleBadge.textContent = 'Chuẩn bị ván mới...';
+    roleBadge.style.borderColor = '#ffffff24';
+  } else if (myRole === 'chaser') {
+    roleBadge.textContent = '🔴 BẠN LÀ NGƯỜI ĐUỔI';
+    roleBadge.style.borderColor = '#ff4040';
+  } else {
+    roleBadge.textContent = '🏃 BẠN LÀ NGƯỜI CHẠY';
+    roleBadge.style.borderColor = '#ffffff24';
+  }
+}
+
 function message(msg){const el=document.createElement('div');el.textContent=msg;el.style.marginBottom='6px';feed.prepend(el);while(feed.children.length>4)feed.lastChild.remove();setTimeout(()=>el.remove(),5000)}
 socket.on('connect',()=>errorBox.textContent='');socket.on('disconnect',()=>{if(gameStarted)message('Mất kết nối máy chủ. Đang kết nối lại…')});
 socket.on('roomState',updateState);socket.on('playerMoved',d=>{const p=players.get(d.id);if(p){p.userData.target.set(d.x,0,d.z);p.rotation.y=d.yaw}});
 socket.on('systemMessage',message);socket.on('connect_error',()=>errorBox.textContent='Không kết nối được máy chủ. Hãy tải lại trang.');
 
-function enter(id){
+function enter(id){document.querySelector('#jumpBtn').style.display = isTouch ? 'block' : 'none';
+document.querySelector('#tagBtn').style.display = isTouch ? 'block' : 'none';
   roomId=id;
   gameStarted=true;
   menu.style.display='none';
@@ -115,7 +223,43 @@ joinBtn.addEventListener('click',()=>{errorBox.textContent='';joinBtn.disabled=t
 roomInput.addEventListener('input',()=>roomInput.value=roomInput.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5));
 document.addEventListener('keydown',e=>{
   keys.add(e.code);
-  if(e.code==='Space'&&!e.repeat)jumpPlayer();if(e.code==='KeyE')tagNearest();if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()});document.addEventListener('keyup',e=>keys.delete(e.code));
+  
+function tagNearest() {
+  if (!gameStarted || !roundActive) {
+    message('Ván đấu chưa bắt đầu!');
+    return;
+  }
+
+  if (myRole !== 'chaser') {
+    message('Bạn là người chạy! Hãy tránh người đuổi.');
+    return;
+  }
+
+  if (Date.now() - lastTag < 350) return;
+  lastTag = Date.now();
+
+  let nearest = null;
+  let dist = 2.4;
+
+  for (const [id, p] of players) {
+    const d = Math.hypot(
+      camera.position.x - p.position.x,
+      camera.position.z - p.position.z
+    );
+
+    if (d < dist) {
+      dist = d;
+      nearest = id;
+    }
+  }
+
+  if (nearest) {
+    socket.emit('tag', { targetId: nearest });
+  } else {
+    message('Hãy đến gần người chơi khác để chạm!');
+  }
+}
+
 document.addEventListener('mousemove',e=>{if(document.pointerLockElement===renderer.domElement&&gameStarted){yaw-=e.movementX*.0022;pitch-=e.movementY*.0022;pitch=Math.max(-1.4,Math.min(1.4,pitch))}});
 renderer.domElement.addEventListener('click',()=>{if(gameStarted&&!isTouch&&document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock?.()});
 
@@ -154,8 +298,12 @@ if(now-lastMoveSent>50&&socket.connected){
   lastMoveSent=now;
   socket.emit('move',{x:camera.position.x,z:camera.position.z,yaw});
 }
-for(const p of players.values()){
-  p.position.lerp(p.userData.target,Math.min(1,dt*14));
+for (const p of players.values()) {
+  p.position.lerp(p.userData.target, Math.min(1, dt * 14));
+
+  if (p.userData.outline) {
+    p.userData.outline.update();
+  }
 }
 }
 renderer.render(scene,camera);
@@ -165,7 +313,22 @@ addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
-animate();
+
+setInterval(() => {
+  if (!roundActive || !roundEndsAt) {
+    roundTimer.textContent = '02:00';
+    return;
+  }
+
+  const seconds = Math.max(0, Math.ceil((roundEndsAt - Date.now()) / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+
+  roundTimer.textContent =
+    `${String(minutes).padStart(2, '0')}:${String(remaining).padStart(2, '0')}`;
+}, 250);
+
+  animate();
 </script>
 </body>
 </html>
