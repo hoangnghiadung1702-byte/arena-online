@@ -136,8 +136,9 @@ function collides(x,z){for(const o of obstacles){const b=new THREE.Box3().setFro
 function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);if(gameStarted){camera.rotation.order='YXZ';camera.rotation.y=yaw;camera.rotation.x=pitch;const forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0)-mobileMove.y,strafe=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0)+mobileMove.x;moveVec.set(strafe,0,-forward);if(moveVec.lengthSq()>1)moveVec.normalize();moveVec.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);const speed=(keys.has('ShiftLeft')?8:5)*dt,nx=camera.position.x+moveVec.x*speed,nz=camera.position.z+moveVec.z*speed
 
 
-if(Math.abs(nx)<28&&!collides(nx,camera.position.z))camera.position.x=nx;
-if(Math.abs(nz)<28&&!collides(camera.position.x,nz))camera.position.z=nz;
+
+if(Math.abs(nx)<28 && !collides(nx,camera.position.z)) camera.position.x=nx;
+if(Math.abs(nz)<28 && !collides(camera.position.x,nz)) camera.position.z=nz;
 
 
 verticalVelocity-=14*dt;
