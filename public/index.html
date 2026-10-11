@@ -304,14 +304,19 @@ for (const p of players.values()) {
   if (p.userData.outline) {
     p.userData.outline.update();
   }
+
+  if (p.userData.outline) {
+    p.userData.outline.update();
+  }
 }
+
+renderer.render(scene, camera);
 }
-renderer.render(scene,camera);
-}
-addEventListener('resize',()=>{
-  camera.aspect=innerWidth/innerHeight;
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
+  renderer.setSize(innerWidth, innerHeight);
 });
 
 setInterval(() => {
@@ -320,7 +325,11 @@ setInterval(() => {
     return;
   }
 
-  const seconds = Math.max(0, Math.ceil((roundEndsAt - Date.now()) / 1000));
+  const seconds = Math.max(
+    0,
+    Math.ceil((roundEndsAt - Date.now()) / 1000)
+  );
+
   const minutes = Math.floor(seconds / 60);
   const remaining = seconds % 60;
 
@@ -328,7 +337,32 @@ setInterval(() => {
     `${String(minutes).padStart(2, '0')}:${String(remaining).padStart(2, '0')}`;
 }, 250);
 
-  animate();
+animate();
+
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+setInterval(() => {
+  if (!roundActive || !roundEndsAt) {
+    roundTimer.textContent = '02:00';
+    return;
+  }
+
+  const seconds = Math.max(
+    0,
+    Math.ceil((roundEndsAt - Date.now()) / 1000)
+  );
+
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+
+  roundTimer.textContent =
+    `${String(minutes).padStart(2, '0')}:${String(remaining).padStart(2, '0')}`;
+}, 250);
+
+animate();
 </script>
 </body>
 </html>
