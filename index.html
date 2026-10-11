@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>FPS Online — Prototype</title>
+  <style>
+    :root { color-scheme: dark; --panel:rgba(11,18,29,.92); --line:#35485c; --accent:#5ed0ff; }
+    * { box-sizing:border-box; }
+    html,body { margin:0;width:100%;height:100%;overflow:hidden;background:#101722;color:#f3f7fb;font-family:Inter,system-ui,Arial,sans-serif; }
+    canvas { display:block; }
+    #menu { position:fixed;z-index:10;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(130deg,rgba(7,14,24,.94),rgba(14,34,50,.82));padding:18px; }
+    .panel { width:min(440px,100%);padding:25px;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:0 24px 80px #0008; }
+    h1 { margin:0 0 7px;font-size:30px;letter-spacing:1px; } .sub { color:#a8b8c9;font-size:14px;line-height:1.5;margin:0 0 22px; }
+    label { display:block;color:#b8c8d8;font-size:13px;margin:12px 0 6px; }
+    input,button { font:inherit;border-radius:10px;padding:12px;border:1px solid #3a5065;width:100%; }
+    input { color:white;background:#111e2c;outline:none; } input:focus { border-color:var(--accent); }
+    button { cursor:pointer;background:#173b50;color:#fff;font-weight:700;border-color:#2e617b;margin-top:10px; }
+    button.primary { background:linear-gradient(100deg,#0785b5,#20a6c9);border:0; }
+    button:disabled { opacity:.5;cursor:wait; }
+    .joinrow { display:flex;gap:8px; } .joinrow input { min-width:0; } .joinrow button { width:130px;flex-shrink:0;margin:0; }
+    #error { color:#ff9292;min-height:20px;font-size:13px;margin-top:10px; }
+    #hud { display:none;position:fixed;z-index:3;inset:0;pointer-events:none;text-shadow:0 2px 4px #000; }
+    #topbar { position:absolute;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start; }
+    .chip { background:#0b1423c9;border:1px solid #ffffff24;padding:9px 12px;border-radius:10px;font-size:13px; }
+    #crosshair { position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%); }
+    #crosshair:before,#crosshair:after { content:"";position:absolute;background:white;box-shadow:0 0 4px #000; }
+    #crosshair:before { width:2px;height:18px;left:8px;top:0; } #crosshair:after { height:2px;width:18px;left:0;top:8px; }
+    #bottom { position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:9px;align-items:center; }
+    #feed { position:absolute;top:70px;right:14px;max-width:240px;text-align:right;font-size:13px;color:#dcecff; }
+    #help { position:absolute;bottom:15px;left:14px;color:#d5e4f2;font-size:12px;max-width:260px;line-height:1.6; }
+    #mobileControls { display:none;position:fixed;z-index:5;inset:0;pointer-events:none; }
+    .touchpad { position:absolute;bottom:25px;width:140px;height:140px;border-radius:50%;background:#16283c99;border:1px solid #ffffff35;pointer-events:auto;touch-action:none; }
+    #stick { left:20px; } #look { right:20px; }
+    .knob { position:absolute;left:42px;top:42px;width:54px;height:54px;border-radius:50%;background:#78d9ff99;border:1px solid #b8edff; }
+    #fire { position:absolute;right:35px;bottom:185px;width:70px;height:70px;border-radius:50%;pointer-events:auto;background:#d84b4bcc;border:2px solid #ffd0d0;touch-action:manipulation; }
+    #mobileHint { position:absolute;bottom:174px;left:22px;color:#fff9;font-size:11px; }
+    @media (pointer:coarse) { #mobileControls.active { display:block; } #help { display:none; } }
+    @media (max-width:600px) { h1{font-size:26px;} .panel{padding:20px;} #topbar{top:8px;left:8px;right:8px;} .chip{font-size:11px;padding:7px 9px;} }
+  </style>
+</head>
+<body>
+  <div id="menu">
+    <div class="panel">
+      <h1>FPS <span style="color:var(--accent)">ONLINE</span></h1>
+      <p class="sub">Prototype multiplayer 3D · Tạo phòng bằng ID · Tối đa 8 người<br>Chơi thử với bạn bè qua Internet.</p>
+      <label for="name">Tên người chơi</label>
+      <input id="name" maxlength="18" placeholder="Ví dụ: PlayerOne" autocomplete="nickname">
+      <button id="create" class="primary">＋ Tạo phòng mới</button>
+      <label for="room">Hoặc nhập ID phòng</label>
+      <div class="joinrow"><input id="room" maxlength="5" placeholder="VD: A7K2Q" autocapitalize="characters"><button id="join">Tham gia</button></div>
+      <div id="error" role="status"></div>
+      <p class="sub" style="margin:8px 0 0;font-size:12px">PC: WASD di chuyển · Chuột ngắm · Click bắn · Esc nhả chuột<br>Điện thoại: dùng cần ảo để di chuyển/ngắm, nút đỏ để bắn.</p>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div id="topbar">
+      <div class="chip" id="roomBadge">PHÒNG —</div>
+      <div class="chip" id="stats">HP 100 · Điểm 0</div>
+      <div class="chip" id="count">Người chơi: 1/8</div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="feed"></div>
+    <div id="help">W A S D: di chuyển · Chuột: ngắm · Click: bắn<br>Click vào màn hình để khóa chuột · ESC để mở khóa</div>
+    <div id="bottom"><div class="chip">🔫 Súng trường · Đạn vô hạn</div></div>
+  </div>
+  <div id="mobileControls">
+    <div id="stick" class="touchpad"><div class="knob"></div></div>
+    <div id="look" class="touchpad"><div class="knob"></div></div>
+    <button id="fire">BẮN</button>
+    <div id="mobileHint">Kéo trái: đi · Kéo phải: nhìn</div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+    const socket = io();
+    const menu = document.querySelector('#menu');
+    const hud = document.querySelector('#hud');
+    const mobileControls = document.querySelector('#mobileControls');
+    const errorBox = document.querySelector('#error');
+    const nameInput = document.querySelector('#name');
+    const roomInput = document.querySelector('#room');
+    const createBtn = document.querySelector('#create');
+    const joinBtn = document.querySelector('#join');
+    const roomBadge = document.querySelector('#roomBadge');
+    const stats = document.querySelector('#stats');
+    const count = document.querySelector('#count');
+    const feed = document.querySelector('#feed');
+    const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
+
+    let myId = null, roomId = null, gameStarted = false;
+    const players = new Map();
+    const keys = new Set();
+    const clock = new THREE.Clock();
+    let yaw = 0, pitch = 0, hp = 100, score = 0;
+    const velocity = new THREE.Vector3();
+    const moveVec = new THREE.Vector3();
+    const raycaster = new THREE.Raycaster();
+    let lastMoveSent = 0, lastShot = 0;
+    let mobileMove = { x: 0, y: 0 };
+    let lookPointer = null, movePointer = null, lastLook = { x: 0, y: 0 };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x8cb5ca);
+    scene.fog = new THREE.Fog(0x8cb5ca, 32, 100);
+    const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 150);
+    camera.position.set(0, 1.65, 8);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0xdff3ff, 0x43505d, 2.0));
+    const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
+    sun.position.set(-10, 22, 8); sun.castShadow = true; scene.add(sun);
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x586c70, roughness: 0.95 }));
+    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+    const grid = new THREE.GridHelper(60, 60, 0x93b2ad, 0x748b8b); grid.position.y = 0.015; scene.add(grid);
+
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x697d88, roughness: .86 });
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0x9b7956, roughness: .9 });
+    const obstacles = [];
+    function box(x,y,z,w,h,d,mat=wallMat) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+      m.position.set(x,y,z); m.castShadow = true; m.receiveShadow = true; scene.add(m);
+      obstacles.push(m); return m;
+    }
+    box(0,1.5,-30,60,3,1); box(0,1.5,30,60,3,1); box(-30,1.5,0,1,3,60); box(30,1.5,0,1,3,60);
+    [
+      [-8,0,-7,3,2.3,3], [7,0,-9,4,2.8,2], [0,0,-15,5,1.5,2],
+      [-15,0,4,2.5,2.5,5], [13,0,3,3,2,3], [1,0,7,4,1.5,2],
+      [-5,0,15,3,2,3], [10,0,16,4,2.5,2], [-18,0,-14,3,2,3],
+      [19,0,-12,2,2.5,4], [0,0,0,2,1.4,2]
+    ].forEach(a => box(a[0], a[1]+a[4]/2, a[2], a[3], a[4], a[5], crateMat));
+
+    // First-person weapon model attached to camera.
+    const weapon = new THREE.Group();
+    const gunMat = new THREE.MeshStandardMaterial({ color: 0x25313b, metalness: .7, roughness: .35 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(.22,.18,.62), gunMat); body.position.set(.32,-.28,-.55); weapon.add(body);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.035,.04,.38,10), gunMat); barrel.rotation.x = Math.PI/2; barrel.position.set(.32,-.24,-.95); weapon.add(barrel);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(.1,.22,.13), new THREE.MeshStandardMaterial({color:0x12191f})); grip.position.set(.32,-.43,-.48); grip.rotation.x=-.2; weapon.add(grip);
+    camera.add(weapon); scene.add(camera);
+
+    function makePlayer(data) {
+      const group = new THREE.Group();
+      const material = new THREE.MeshStandardMaterial({ color: data.color || '#58c4f6', roughness: .7 });
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(.65,.85,.35), material); torso.position.y=1.05; torso.castShadow=true; group.add(torso);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(.23,14,12), new THREE.MeshStandardMaterial({color:0xe1b99a})); head.position.y=1.68; head.castShadow=true; group.add(head);
+      const legsMat = new THREE.MeshStandardMaterial({color:0x263543});
+      for (const x of [-.19,.19]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(.2,.55,.23), legsMat); leg.position.set(x,.35,0); leg.castShadow=true; group.add(leg); }
+      const labelCanvas = document.createElement('canvas'); labelCanvas.width=256; labelCanvas.height=64;
+      const ctx=labelCanvas.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.font='bold 28px Arial'; ctx.textAlign='center'; ctx.fillText(String(data.name||'Player').slice(0,18),128,38);
+      const tex=new THREE.CanvasTexture(labelCanvas); const label=new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false}));
+      label.position.y=2.15; label.scale.set(2.4,.6,1); group.add(label);
+      group.userData = { id:data.id, name:data.name, hp:data.hp ?? 100, score:data.score ?? 0, target:new THREE.Vector3(data.x||0,0,data.z||0), color:data.color };
+      group.position.set(data.x||0,0,data.z||0); scene.add(group);
+      return group;
+    }
+
+    function upsertPlayer(data) {
+      if (!data || data.id === myId) return;
+      let p=players.get(data.id);
+      if (!p) { p=makePlayer(data); players.set(data.id,p); }
+      p.userData.target.set(Number(data.x)||0,0,Number(data.z)||0);
+      if (Number.isFinite(data.yaw)) p.rotation.y=data.yaw;
+      if (data.hp !== undefined) p.userData.hp=data.hp;
+      if (data.score !== undefined) p.userData.score=data.score;
+    }
+    function removeMissing(incoming) {
+      const ids = new Set(incoming.map(p=>p.id));
+      for (const [id,p] of players) if (!ids.has(id)) { scene.remove(p); players.delete(id); }
+    }
+    function updateState(state) {
+      if (state.roomId) roomId=state.roomId;
+      removeMissing(state.players || []);
+      for (const p of (state.players || [])) upsertPlayer(p);
+      count.textContent=`Người chơi: ${(state.players||[]).length}/8`;
+      const mine=(state.players||[]).find(p=>p.id===myId);
+      if(mine){ hp=mine.hp; score=mine.score; stats.textContent=`HP ${hp} · Điểm ${score}`; }
+    }
+    function showMessage(message) {
+      const item=document.createElement('div'); item.textContent=message; item.style.marginBottom='6px';
+      feed.prepend(item); while(feed.children.length>4) feed.lastChild.remove();
+      setTimeout(()=>item.remove(),5000);
+    }
+
+    socket.on('connect',()=>{ errorBox.textContent=''; });
+    socket.on('disconnect',()=>{ if(gameStarted) showMessage('Mất kết nối máy chủ. Đang thử kết nối lại…'); });
+    socket.on('roomState',updateState);
+    socket.on('playerMoved',data=>{ const p=players.get(data.id); if(p){p.userData.target.set(data.x,0,data.z);p.rotation.y=data.yaw;} });
+    socket.on('playerHit',data=>{
+      if(data.targetId===myId){ hp=data.hp; stats.textContent=`HP ${hp} · Điểm ${score}`; flashDamage(); }
+      if(data.shooterId===myId && data.hp===0) { score=data.score; stats.textContent=`HP ${hp} · Điểm ${score}`; }
+    });
+    socket.on('systemMessage',showMessage);
+    socket.on('connect_error',()=>{errorBox.textContent='Không kết nối được máy chủ. Hãy tải lại trang.';});
+
+    function enterGame(id) {
+      roomId=id; gameStarted=true; menu.style.display='none'; hud.style.display='block';
+      roomBadge.textContent=`PHÒNG ${id}`;
+      mobileControls.classList.toggle('active',isTouch);
+      camera.position.set(0,1.65,8);
+      if(!isTouch) renderer.domElement.requestPointerLock?.();
+      showMessage(`Đã vào phòng ${id}. Chia sẻ ID cho bạn bè!`);
+    }
+    function getName(){return nameInput.value.trim() || 'Player';}
+    createBtn.addEventListener('click',()=>{
+      errorBox.textContent=''; createBtn.disabled=true;
+      socket.emit('createRoom',{name:getName()},res=>{
+        createBtn.disabled=false;
+        if(!res?.ok){errorBox.textContent=res?.error||'Không tạo được phòng.';return;}
+        myId=res.playerId; enterGame(res.roomId);
+      });
+    });
+    joinBtn.addEventListener('click',()=>{
+      errorBox.textContent=''; joinBtn.disabled=true;
+      socket.emit('joinRoom',{roomId:roomInput.value,name:getName()},res=>{
+        joinBtn.disabled=false;
+        if(!res?.ok){errorBox.textContent=res?.error||'Không tham gia được phòng.';return;}
+        myId=res.playerId; enterGame(res.roomId);
+      });
+    });
+    roomInput.addEventListener('input',()=>{roomInput.value=roomInput.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);});
+    document.addEventListener('keydown',e=>{keys.add(e.code); if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();});
+    document.addEventListener('keyup',e=>keys.delete(e.code));
+    document.addEventListener('mousemove',e=>{
+      if(document.pointerLockElement===renderer.domElement && gameStarted){yaw-=e.movementX*.0022; pitch-=e.movementY*.0022; pitch=Math.max(-1.4,Math.min(1.4,pitch));}
+    });
+    renderer.domElement.addEventListener('click',()=>{
+      if(gameStarted && !isTouch && document.pointerLockElement!==renderer.domElement) renderer.domElement.requestPointerLock?.();
+    });
+    document.addEventListener('pointerlockchange',()=>{});
+
+    function tryShoot() {
+      if(!gameStarted || Date.now()-lastShot<220) return;
+      lastShot=Date.now();
+      weapon.position.z=.07; setTimeout(()=>weapon.position.z=0,65);
+      raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+      const candidates=[];
+      for(const [id,p] of players) {
+        if(p.userData.hp<=0) continue;
+        const targets=p.children.filter(o=>o.isMesh);
+        for(const t of targets) t.userData.playerId=id;
+        candidates.push(...targets);
+      }
+      const hits=raycaster.intersectObjects(candidates,false);
+      const obstacleHits=raycaster.intersectObjects(obstacles,false);
+      if(hits.length && (!obstacleHits.length || hits[0].distance<obstacleHits[0].distance)) {
+        socket.emit('shoot',{targetId:hits[0].object.userData.playerId});
+      }
+      const flash=new THREE.PointLight(0xffcc77,2,3); flash.position.set(.32,-.23,-1.05); camera.add(flash); setTimeout(()=>camera.remove(flash),55);
+    }
+    document.addEventListener('mousedown',e=>{if(e.button===0 && gameStarted && !isTouch) tryShoot();});
+    document.querySelector('#fire').addEventListener('pointerdown',e=>{e.preventDefault();tryShoot();});
+
+    function flashDamage(){
+      const el=document.createElement('div'); el.style.cssText='position:fixed;inset:0;z-index:4;pointer-events:none;border:8px solid #ff334477;background:#ff000018';
+      document.body.appendChild(el);setTimeout(()=>el.remove(),140);
+    }
+
+    function bindPad(element,kind) {
+      const knob=element.querySelector('.knob');
+      element.addEventListener('pointerdown',e=>{
+        e.preventDefault(); element.setPointerCapture(e.pointerId);
+        if(kind==='move') movePointer=e.pointerId; else lookPointer=e.pointerId;
+        lastLook={x:e.clientX,y:e.clientY}; handlePad(e);
+      });
+      element.addEventListener('pointermove',e=>{
+        if((kind==='move'&&e.pointerId===movePointer)||(kind==='look'&&e.pointerId===lookPointer)){
+          e.preventDefault();
+          if(kind==='move') handlePad(e);
+          else { yaw-=(e.clientX-lastLook.x)*.009; pitch-=(e.clientY-lastLook.y)*.009; pitch=Math.max(-1.35,Math.min(1.35,pitch)); lastLook={x:e.clientX,y:e.clientY}; }
+        }
+      });
+      function release(e){
+        if(kind==='move'&&e.pointerId===movePointer){movePointer=null;mobileMove={x:0,y:0};knob.style.transform='translate(0,0)';}
+        if(kind==='look'&&e.pointerId===lookPointer)lookPointer=null;
+      }
+      element.addEventListener('pointerup',release); element.addEventListener('pointercancel',release);
+      function handlePad(e){
+        const r=element.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+        let dx=e.clientX-cx,dy=e.clientY-cy;const max=43,len=Math.hypot(dx,dy);
+        if(len>max){dx=dx/len*max;dy=dy/len*max;}
+        knob.style.transform=`translate(${dx}px,${dy}px)`;
+        mobileMove={x:dx/max,y:dy/max};
+      }
+    }
+    bindPad(document.querySelector('#stick'),'move');
+    bindPad(document.querySelector('#look'),'look');
+
+    function animate(){
+      requestAnimationFrame(animate);
+      const dt=Math.min(clock.getDelta(),.05);
+      if(gameStarted){
+        camera.rotation.order='YXZ'; camera.rotation.y=yaw; camera.rotation.x=pitch;
+        const forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0) - mobileMove.y;
+        const strafe=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0) + mobileMove.x;
+        moveVec.set(strafe,0,-forward);
+        if(moveVec.lengthSq()>1) moveVec.normalize();
+        moveVec.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+        const speed=(keys.has('ShiftLeft')?8:5)*dt;
+        const nx=camera.position.x+moveVec.x*speed, nz=camera.position.z+moveVec.z*speed;
+        if(Math.abs(nx)<28 && !collides(nx,camera.position.z)) camera.position.x=nx;
+        if(Math.abs(nz)<28 && !collides(camera.position.x,nz)) camera.position.z=nz;
+        camera.position.y=1.65;
+        const now=performance.now();
+        if(now-lastMoveSent>50 && socket.connected){
+          lastMoveSent=now;
+          socket.emit('move',{x:camera.position.x,z:camera.position.z,yaw,pitch});
+        }
+        for(const p of players.values()) p.position.lerp(p.userData.target,Math.min(1,dt*14));
+      }
+      renderer.render(scene,camera);
+    }
+    function collides(x,z){
+      // Simple player-vs-crate collision on the horizontal plane.
+      for(const o of obstacles){
+        if(o.geometry.type!=='BoxGeometry') continue;
+        const b=new THREE.Box3().setFromObject(o);
+        if(x>b.min.x-.35&&x<b.max.x+.35&&z>b.min.z-.35&&z<b.max.z+.35&&b.max.y>0.6) return true;
+      }
+      return false;
+    }
+    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+    animate();
+  </script>
+</body>
+</html>
