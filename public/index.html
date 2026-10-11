@@ -19,7 +19,24 @@ button{cursor:pointer;background:#173b50;color:#fff;font-weight:700;border-color
 #help{position:absolute;bottom:15px;left:14px;color:#d5e4f2;font-size:12px;max-width:280px;line-height:1.6}
 #mobileControls{display:none;position:fixed;z-index:5;inset:0;pointer-events:none}.touchpad{position:absolute;bottom:25px;width:140px;height:140px;border-radius:50%;background:#16283c99;border:1px solid #ffffff35;pointer-events:auto;touch-action:none}
 #stick{left:20px}#look{right:20px}.knob{position:absolute;left:42px;top:42px;width:54px;height:54px;border-radius:50%;background:#78d9ff99;border:1px solid #b8edff}
-#tagBtn{position:absolute;right:35px;bottom:185px;width:78px;height:78px;border-radius:50%;pointer-events:auto;background:#168e9dcc;border:2px solid #c4fff4;touch-action:manipulation}
+#tagBtn
+#jumpBtn{
+  position:absolute;
+  right:35px;
+  bottom:275px;
+  width:78px;
+  height:78px;
+  padding:0;
+  margin:0;
+  border-radius:50%;
+  pointer-events:auto;
+  background:#e6a23cdd;
+  border:2px solid #ffe0a3;
+  color:white;
+  font-weight:800;
+  touch-action:manipulation;
+}
+{position:absolute;right:35px;bottom:185px;width:78px;height:78px;border-radius:50%;pointer-events:auto;background:#168e9dcc;border:2px solid #c4fff4;touch-action:manipulation}
 #mobileHint{position:absolute;bottom:174px;left:22px;color:#fff9;font-size:11px}
 @media(pointer:coarse){#mobileControls.active{display:block}#help{display:none}}@media(max-width:600px){h1{font-size:26px}.panel{padding:20px}#topbar{top:8px;left:8px;right:8px}.chip{font-size:11px;padding:7px 9px}}
 </style></head>
@@ -35,6 +52,7 @@ button{cursor:pointer;background:#173b50;color:#fff;font-weight:700;border-color
 </div></div>
 <div id="hud"><div id="topbar"><div class="chip" id="roomBadge">PHÒNG —</div><div class="chip" id="stats">Điểm 0</div><div class="chip" id="count">Người chơi: 1/8</div></div><div id="crosshair"></div><div id="feed"></div><div id="help">W A S D: di chuyển · Chuột: nhìn quanh<br>E: chạm người chơi ở gần · ESC: nhả chuột</div></div>
 <div id="mobileControls"><div id="stick" class="touchpad"><div class="knob"></div></div><div id="look" class="touchpad"><div class="knob"></div></div><button id="tagBtn">CHẠM</button><div id="mobileHint">Kéo trái: đi · Kéo phải: nhìn</div></div>
+<button id="jumpBtn">NHẢY</button>
 <script src="/socket.io/socket.io.js"></script>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
@@ -44,6 +62,8 @@ const createBtn=document.querySelector('#create'),joinBtn=document.querySelector
 const stats=document.querySelector('#stats'),count=document.querySelector('#count'),feed=document.querySelector('#feed');
 const isTouch=matchMedia('(pointer: coarse)').matches||('ontouchstart'in window);
 let myId=null,roomId=null,gameStarted=false,yaw=0,pitch=0,score=0,lastMoveSent=0,lastTag=0;
+let jumpY=0,verticalVelocity=0;
+let verticalVelocity=0, isJumping=false;
 const players=new Map(),keys=new Set(),clock=new THREE.Clock(),moveVec=new THREE.Vector3(),raycaster=new THREE.Raycaster();
 let mobileMove={x:0,y:0},lookPointer=null,movePointer=null,lastLook={x:0,y:0};
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x8cb5ca);scene.fog=new THREE.Fog(0x8cb5ca,32,100);
@@ -93,9 +113,21 @@ function playerName(){return nameInput.value.trim()||'Player'}
 createBtn.addEventListener('click',()=>{errorBox.textContent='';createBtn.disabled=true;socket.emit('createRoom',{name:playerName()},r=>{createBtn.disabled=false;if(!r?.ok){errorBox.textContent=r?.error||'Không tạo được phòng';return}myId=r.playerId;enter(r.roomId)})});
 joinBtn.addEventListener('click',()=>{errorBox.textContent='';joinBtn.disabled=true;socket.emit('joinRoom',{roomId:roomInput.value,name:playerName()},r=>{joinBtn.disabled=false;if(!r?.ok){errorBox.textContent=r?.error||'Không tham gia được phòng';return}myId=r.playerId;enter(r.roomId)})});
 roomInput.addEventListener('input',()=>roomInput.value=roomInput.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5));
-document.addEventListener('keydown',e=>{keys.add(e.code);if(e.code==='KeyE')tagNearest();if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()});document.addEventListener('keyup',e=>keys.delete(e.code));
+document.addEventListener('keydown',e=>{
+  keys.add(e.code);
+  if(e.code==='Space'&&!e.repeat)jumpPlayer();if(e.code==='KeyE')tagNearest();if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()});document.addEventListener('keyup',e=>keys.delete(e.code));
 document.addEventListener('mousemove',e=>{if(document.pointerLockElement===renderer.domElement&&gameStarted){yaw-=e.movementX*.0022;pitch-=e.movementY*.0022;pitch=Math.max(-1.4,Math.min(1.4,pitch))}});
 renderer.domElement.addEventListener('click',()=>{if(gameStarted&&!isTouch&&document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock?.()});
+
+function jumpPlayer(){
+  if(!gameStarted||jumpY>0)return;
+  verticalVelocity=6;
+}
+document.querySelector('#jumpBtn').addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  jumpPlayer();
+});
+
 function tagNearest(){if(!gameStarted||Date.now()-lastTag<350)return;lastTag=Date.now();let nearest=null,dist=2.4;for(const [id,p]of players){const d=Math.hypot(camera.position.x-p.position.x,camera.position.z-p.position.z);if(d<dist){dist=d;nearest=id}}if(nearest)socket.emit('tag',{targetId:nearest});else message('Hãy đến gần người chơi khác để chạm!')}
 document.querySelector('#tagBtn').addEventListener('pointerdown',e=>{e.preventDefault();tagNearest()});
 function bindPad(el,kind){const knob=el.querySelector('.knob');el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);if(kind==='move')movePointer=e.pointerId;else lookPointer=e.pointerId;lastLook={x:e.clientX,y:e.clientY};handle(e)});el.addEventListener('pointermove',e=>{if((kind==='move'&&e.pointerId===movePointer)||(kind==='look'&&e.pointerId===lookPointer)){e.preventDefault();if(kind==='move')handle(e);else{yaw-=(e.clientX-lastLook.x)*.009;pitch-=(e.clientY-lastLook.y)*.009;pitch=Math.max(-1.35,Math.min(1.35,pitch));lastLook={x:e.clientX,y:e.clientY}}}});function release(e){if(kind==='move'&&e.pointerId===movePointer){movePointer=null;mobileMove={x:0,y:0};knob.style.transform='translate(0,0)'}if(kind==='look'&&e.pointerId===lookPointer)lookPointer=null}el.addEventListener('pointerup',release);el.addEventListener('pointercancel',release);function handle(e){const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy,max=43,len=Math.hypot(dx,dy);if(len>max){dx=dx/len*max;dy=dy/len*max}knob.style.transform=`translate(${dx}px,${dy}px)`;mobileMove={x:dx/max,y:dy/max}}}
@@ -105,7 +137,15 @@ function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDel
 
 if(Math.abs(nx)<28)camera.position.x=nx;
 if(Math.abs(nz)<28)camera.position.z=nz;
-camera.position.y=1.65;
+
+verticalVelocity-=14*dt;
+jumpY+=verticalVelocity*dt;
+if(jumpY<0){
+  jumpY=0;
+  verticalVelocity=0;
+}
+camera.position.y=1.65+jumpY;
+
 const now=performance.now();
 if(now-lastMoveSent>50&&socket.connected){
   lastMoveSent=now;
